@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.study.SpringSecurityMybatis.repository.BoardMapper">
+    <resultMap id="boardResultMap" type="com.study.SpringSecurityMybatis.entity.Board">
+        <id property="id" column="board_id" />
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="userId" column="user_id"/>
+        <result property="viewCount" column="view_count"/>
+        <association property="user" resultMap="userResultMap"/>
+    </resultMap>
+    <resultMap id="userResultMap" type="com.study.SpringSecurityMybatis.entity.User">
+        <id property="id" column="u_user_id" />
+        <result property="username" column="username"/>
+    </resultMap>
+<!--   3 Get -->
+    <insert id="save" useGeneratedKeys="true" keyProperty="id">
+        insert into board
+        values(default, #{title}, #{content}, #{userId}, default)
+    </insert>
+    <update id="modifyViewCountById">
+        update board
+        set
+            view_count = view_count + 1
+        where
+            id = #{id}
+    </update>
+    <delete id="deleteByBoardId">
+        delete
+        from
+            board
+        where
+            id = #{boardId}
+    </delete>
+    <!--    1 POST-->
+    <select id="findById" resultMap="boardResultMap">
+        select
+            b.id as board_id,
+            b.title,
+            b.content,
+            b.user_id,
+            b.view_count,
+            u.id as u_user_id,
+            u.username
+        from
+            board b
+            left outer join user u on(u.id = b.user_id)
+        where
+            b.id = #{id};
+    </select>
+    <select id="findByBoardIdAndUserId" resultType="com.study.SpringSecurityMybatis.entity.BoardLike">
+        select
+            id,
+            board_id ad boardId
+            user_id as userId
+        from
+            board_like
+        where
+            board_id = #{boardId}
+            and user_id = #{UserId}
+    </select>
+    <select id="findAllByStartIndexAndLimit" resultType="com.study.SpringSecurityMybatis.entity.BoardList">
+        with like_count as (
+            select
+                board_id,
+                count(*) as like_cnt
+            from
+                board_like
+            group by
+                board_id
+        )
+
+        select
+            b.id,
+            b.title,
+            b.content,
+            u.img as writerProfileImg,
+            u.username as writerName,
+            ifnull(lc.like_cnt,0) as likeCount,
+            b.view_count as viewCount
+        from
+            board b
+            left outer join user u on(u.id = b.user_id)
+            left outer join like_count lc on(lc.board_id = b.id)
+        order by
+            b.id desc
+        limit #{startIndex}, #{limit}
+
+    </select>
+    <!--    2 GET -->
+    <select id="getCountAll" resultType="java.lang.Integer">
+        select
+            count(*)
+        from
+            board
+    </select>
+    <select id="findAllBySearch" resultType="com.study.SpringSecurityMybatis.entity.BoardList">
+            with like_count as (
+        select
+            board_id,
+            count(*) as like_cnt
+        from
+            board_like
+        group by
+            board_id
+            )
+
+        select
+            b.id,
+            b.title,
+            b.content,
+            u.username as writerName,
+            u.img as writerProfileImg,
+            ifnull(lc.like_cnt, 0) as likeCount,
+            b.view_count as viewCount
+        from
+            board b
+            left outer join user u on(u.id = b.user_id)
+            left outer join like_count lc on(lc.board_id = b.id)
+        where
+        <!-- 1=1은 항상 true이기 때문에 전체 검색이 됨 -->
+        <!-- where문에는 and로 시작하면 안 됨 -->
+        <!-- 조건문이 들어갈 경우 거의 필수로 1=1을 넣어줌 -->
+        <!-- 좌우 공백이 들어있거나(trim) null인 경우(ifnull) 함께 처리 -->
+        1 = 1
+        <if test='option.equals("all")'>
+            and (
+            b.title like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+            or u.username like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+            )
+        </if>
+        <if test='option.equals("title")'>
+            and b.title like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+        </if>
+        <if test='option.equals("writer")'>
+            and u.username like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+        </if>
+        <!-- 위, 아래 동일한 조건임 -->
+        <!-- 여기서 when은 if, otherwise는 else로 생각하면 됨 -->
+        <!--            <choose>-->
+        <!--                <when test='option.equals("title")'>-->
+        <!--                    and b.title like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')-->
+        <!--                </when>-->
+        <!--                <when test='option.equals("writer")'>-->
+        <!--                    and u.username like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')-->
+        <!--                </when>-->
+        <!--                <otherwise>-->
+        <!--                    and (-->
+        <!--                        b.title like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')-->
+        <!--                        or u.username like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')-->
+        <!--                    )-->
+        <!--                </otherwise>-->
+        <!--            </choose>-->
+
+        order by
+            b.id desc
+        limit #{startIndex}, #{limit}
+    </select>
+    <select id="getCountAllBySearch" resultType="java.lang.Integer">
+        select
+            count(*)
+        from
+            board b
+            left outer join user u on(u.id = b.user_id)
+        where
+        1 = 1
+        <if test='option.equals("all")'>
+            and (
+            b.title like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+            or u.username like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+            )
+        </if>
+        <if test='option.equals("title")'>
+            and b.title like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+        </if>
+        <if test='option.equals("writer")'>
+            and u.username like concat('%', trim(ifnull(#{searchValue}, ''), ''), '%')
+        </if>
+    </select>
+</mapper>
